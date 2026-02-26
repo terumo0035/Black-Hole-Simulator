@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relativistic Black Hole Simulation</title>
+    <link rel="stylesheet" href="index.css">
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <canvas id="glcanvas"></canvas>
+
+    <div id="hud">
+        <div class="panel top-left">
+            <h2>SPACECRAFT TELEMETRY</h2>
+            <div class="data-row">
+                <span class="label">DISTANCE (r_s):</span>
+                <span class="value" id="dist-val">10.000</span>
+            </div>
+            <div class="data-row">
+                <span class="label">VELOCITY (%c):</span>
+                <span class="value" id="vel-val">0.000</span>
+            </div>
+            <div class="data-row">
+                <span class="label">TIME DILATION:</span>
+                <span class="value" id="time-val">1.000</span>
+            </div>
+        </div>
+
+        <div class="panel bottom-left controls">
+            <h3>FLIGHT CONTROLS</h3>
+            <ul>
+                <li><span>W / R</span><span>Main Thrusters (Forward/Backward)</span></li>
+                <li><span>A / S</span><span>Angular Thrusters (Strafe)</span></li>
+                <li><span>Mouse</span><span>Attitude Control (Drag to Look)</span></li>
+            </ul>
+        </div>
+
+        <div id="warning-banner" class="hidden">
+            WARNING: APPROACHING EVENT HORIZON
+        </div>
+
+        <div id="crosshair">+</div>
+    </div>
+
+    <script>
+        window.onerror = function (msg, url, line, col, error) {
+            const errDiv = document.createElement('div');
+            errDiv.style.position = 'absolute';
+            errDiv.style.top = '10px';
+            errDiv.style.right = '10px';
+            errDiv.style.color = 'red';
+            errDiv.style.backgroundColor = 'black';
+            errDiv.style.padding = '10px';
+            errDiv.style.zIndex = '9999';
+            errDiv.innerText = msg + ' at ' + line + ':' + col;
+            document.body.appendChild(errDiv);
+        };
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gl-matrix/3.4.1/gl-matrix-min.js"></script>
+    <script src="main.js"></script>
+</body>
+
+</html>
