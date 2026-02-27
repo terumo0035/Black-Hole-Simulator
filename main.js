@@ -20,198 +20,162 @@ const vsSource = `
 
 const fsSource = `
     precision highp float;
-    
+
     uniform vec2 u_resolution;
     uniform vec3 u_camPos;
     uniform vec3 u_camForward;
     uniform vec3 u_camRight;
     uniform vec3 u_camUp;
     uniform float u_time;
-    uniform vec3 u_velocity; // Spacecraft velocity vector
+    uniform vec3 u_velocity;
 
     varying vec2 v_uv;
 
-    const int MAX_STEPS = 1000;
-    const float STEP_SIZE = 0.1;
-    const float RS = 1.0; // Schwarzschild radius scaled to 1
-    const float ISCO = 3.0 * RS; // Inner Most Stable Circular Orbit
-    const float DISK_OUTER = 12.0 * RS;
+    const int MAX_STEPS = 700;
+    const float RS = 1.0;
+    const float ISCO = 3.0;
+    const float DISK_OUTER = 18.0;
 
-    // Noise function for stars and disk
     float hash(vec3 p) {
-        p  = fract( p*0.3183099 + .1 );
+        p = fract(p * 0.3183099 + 0.1);
         p *= 17.0;
-        return fract( p.x*p.y*p.z*(p.x+p.y+p.z) );
+        return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
     }
 
     float noise(vec3 x) {
         vec3 p = floor(x);
         vec3 f = fract(x);
-        f = f*f*(3.0-2.0*f);
-        return mix(mix(mix(hash(p+vec3(0,0,0)), hash(p+vec3(1,0,0)),f.x),
-                       mix(hash(p+vec3(0,1,0)), hash(p+vec3(1,1,0)),f.x),f.y),
-                   mix(mix(hash(p+vec3(0,0,1)), hash(p+vec3(1,0,1)),f.x),
-                       mix(hash(p+vec3(0,1,1)), hash(p+vec3(1,1,1)),f.x),f.y),f.z);
+        f = f * f * (3.0 - 2.0 * f);
+        return mix(
+            mix(mix(hash(p + vec3(0.0, 0.0, 0.0)), hash(p + vec3(1.0, 0.0, 0.0)), f.x),
+                mix(hash(p + vec3(0.0, 1.0, 0.0)), hash(p + vec3(1.0, 1.0, 0.0)), f.x), f.y),
+            mix(mix(hash(p + vec3(0.0, 0.0, 1.0)), hash(p + vec3(1.0, 0.0, 1.0)), f.x),
+                mix(hash(p + vec3(0.0, 1.0, 1.0)), hash(p + vec3(1.0, 1.0, 1.0)), f.x), f.y), f.z);
     }
 
-    // Procedural starry background
-    vec3 getBackground(vec3 dir) {
-        float n = noise(dir * 200.0);
-        float star = pow(n, 40.0) * 10.0;
-        float n2 = noise(dir * 50.0);
-        vec3 galaxy = vec3(0.1, 0.2, 0.4) * pow(n2, 3.0);
-        return vec3(star) + galaxy;
+    vec3 starfield(vec3 dir) {
+        float milky = smoothstep(0.35, 0.9, noise(dir * 18.0));
+        vec3 dust = vec3(0.07, 0.11, 0.2) * milky;
+
+        float sparkle = pow(noise(dir * 280.0), 42.0) * 8.0;
+        float giant = pow(noise(dir * 75.0), 25.0) * 1.8;
+        return dust + vec3(sparkle + giant);
+    }
+
+    vec3 dopplerTint(vec3 c, float shift) {
+        vec3 red = vec3(c.r + 0.2 * c.g, c.g * 0.6, c.b * 0.45);
+        vec3 blue = vec3(c.r * 0.6, c.g + 0.25 * c.b, c.b + 0.4 * c.g);
+        float tBlue = smoothstep(1.0, 1.8, shift);
+        float tRed = smoothstep(1.0, 0.45, shift);
+        vec3 tinted = mix(c, blue, tBlue);
+        tinted = mix(tinted, red, tRed);
+        return tinted;
     }
 
     void main() {
-        // Normalized device coordinates (-1 to 1)
         vec2 uv = (v_uv - 0.5) * 2.0;
         uv.x *= u_resolution.x / u_resolution.y;
 
-        // Initial ray setup
         vec3 ro = u_camPos;
-        // FOV ~90 degrees
         vec3 rd = normalize(u_camForward + uv.x * u_camRight + uv.y * u_camUp);
 
-        // Relativistic aberration (Doppler beaming / headlight effect) approximation
-        // If moving fast, rays are bunched up forward.
-        // v/c is represented by length(u_velocity) which is [0, 1)
         float speed = length(u_velocity);
-        if (speed > 0.001) {
-            vec3 beta = u_velocity;
-            float gamma = 1.0 / sqrt(1.0 - speed * speed + 0.001);
-            float dotP = dot(rd, beta) / speed;
-            // Simplified aberration
-            vec3 parallel = dotP * beta / speed;
-            vec3 perp = rd - parallel;
-            rd = normalize((parallel + beta) + perp / gamma);
+        if (speed > 0.0005) {
+            vec3 beta = u_velocity / speed;
+            float gamma = 1.0 / sqrt(max(0.0004, 1.0 - speed * speed));
+            float rdPar = dot(rd, beta);
+            vec3 par = rdPar * beta;
+            vec3 perp = rd - par;
+            rd = normalize((par + beta * speed) + perp / gamma);
         }
 
-        vec3 color = vec3(0.0);
-        float hitDisk = 0.0;
-        
-        // Raymarching variables
         vec3 pos = ro;
         vec3 dir = rd;
-        float dt = STEP_SIZE;
-        
-        float diskAlpha = 0.0;
-        vec3 diskColorAccum = vec3(0.0);
 
-        for(int i = 0; i < MAX_STEPS; i++) {
+        vec3 diskAccum = vec3(0.0);
+        float diskAlpha = 0.0;
+        vec3 outColor = vec3(0.0);
+
+        for (int i = 0; i < MAX_STEPS; i++) {
             float r2 = dot(pos, pos);
             float r = sqrt(r2);
-
-            // Black hole event horizon
-            if (r < RS * 1.02) {
-                break; 
+            if (r <= RS * 1.002) {
+                outColor = vec3(0.0);
+                break;
             }
 
-            // Geodesic equation for null paths (light) in Schwarzschild 
-            // a = -1.5 * rs * L^2 * r^-5 * pos
             vec3 L = cross(pos, dir);
             float L2 = dot(L, L);
-            vec3 accel = -1.5 * RS * L2 * pos / (r2 * r2 * r);
+            vec3 accel = -1.5 * RS * L2 * pos / max(0.0001, (r2 * r2 * r));
 
-            // Update direction and position (Euler integration)
-            float stepScale = 0.05 + r * 0.05;  // Step size can be moderate for performance since we will interpolate the disk hit
+            float stepScale = clamp(0.025 * r + 0.02, 0.02, 0.22);
             dir = normalize(dir + accel * stepScale);
-            
             vec3 nextPos = pos + dir * stepScale;
 
-            // Check accretion disk intersection (y = 0 plane)
-            // If the ray crosses the y=0 plane between pos and nextPos
             if (pos.y * nextPos.y <= 0.0) {
-                // Find exact intersection point on the plane y=0 using linear interpolation
-                float tHit = pos.y / (pos.y - nextPos.y);
-                // Handle division by zero edge case
-                if (pos.y == nextPos.y) tHit = 0.5; 
-                
-                vec3 hitPos = mix(pos, nextPos, tHit);
-                float distToCenter = length(hitPos.xz);
-                
-                if (distToCenter > ISCO && distToCenter < DISK_OUTER) {
-                    // Disk hit! Calculate properties at the exact hitPos
-                    float diskR = distToCenter;
-                    
-                    // Keplerian velocity of disk v = sqrt(GM/r)
-                    float v_disk = sqrt(RS / (2.0 * diskR));
-                    vec3 diskVel = normalize(vec3(-hitPos.z, 0.0, hitPos.x)) * v_disk;
-                    
-                    // Doppler shift factor D = 1 / (gamma * (1 - v * cos(theta)))
-                    float gamma_disk = 1.0 / sqrt(1.0 - v_disk * v_disk);
-                    float cosTheta = dot(dir, normalize(diskVel));
-                    float D = 1.0 / (gamma_disk * (1.0 - v_disk * cosTheta));
-                    
-                    // Gravitational redshift
-                    float gravRedshift = sqrt(1.0 - RS / diskR);
-                    float totalShift = D * gravRedshift;
+                float tPlane = (abs(pos.y - nextPos.y) < 0.0001) ? 0.5 : pos.y / (pos.y - nextPos.y);
+                vec3 hitPos = mix(pos, nextPos, tPlane);
+                float diskR = length(hitPos.xz);
+                if (diskR > ISCO && diskR < DISK_OUTER) {
+                    float vk = sqrt(RS / (2.0 * diskR));
+                    vec3 diskVel = normalize(vec3(-hitPos.z, 0.0, hitPos.x)) * vk;
 
-                    // Procedural texture for disk
-                    // Avoid seam from atan by using sine/cosine combined with smooth noise
+                    float gammaDisk = 1.0 / sqrt(max(0.0004, 1.0 - vk * vk));
+                    float D = 1.0 / (gammaDisk * (1.0 - dot(diskVel, -dir)));
+                    float grav = sqrt(max(0.001, 1.0 - RS / diskR));
+                    float shift = D * grav;
+
                     float angle = atan(hitPos.z, hitPos.x);
-                    float rotAngle = angle - u_time * v_disk * 2.0; 
-                    vec3 rotPos = vec3(cos(rotAngle)*diskR, 0.0, sin(rotAngle)*diskR);
-                    
-                    // High-quality continuous noise using the exact float position
-                    // Add a fractional offset to time to prevent sampling exactly on the z=0 integer noise plane at startup, which causes grid artifacts
-                    float density = noise(vec3(rotPos.x * 2.5, rotPos.z * 2.5, u_time * 0.5 + 13.73));
-                    
-                    // Radial fading
-                    density *= smoothstep(ISCO, ISCO + 1.0, diskR) * smoothstep(DISK_OUTER, DISK_OUTER - 2.0, diskR);
+                    float swirl = sin(angle * 16.0 - u_time * 4.0 * vk) * 0.5 + 0.5;
+                    float turbulence = noise(vec3(hitPos.xz * 1.3, u_time * 0.15));
+                    float density = smoothstep(ISCO, ISCO + 0.6, diskR)
+                        * (1.0 - smoothstep(DISK_OUTER - 2.5, DISK_OUTER, diskR))
+                        * (0.45 + 0.9 * swirl)
+                        * (0.6 + turbulence);
 
-                    // Base color maps temperature (hot inner, cooler outer)
-                    vec3 baseColor = mix(vec3(1.0, 0.9, 0.5), vec3(1.0, 0.3, 0.0), (diskR - ISCO) / (DISK_OUTER - ISCO));
-                    
-                    // Apply relativistic shift to color (blueshift becomes brighter/bluer, redshift becomes dimmer/redder)
-                    vec3 shiftColor = baseColor * pow(totalShift, 3.0); 
-                    
-                    // Since it's infinitely thin geometrically, we assign an arbitrary thickness opacity
-                    float alpha = clamp(density * 1.5, 0.0, 1.0);
-                    diskColorAccum += (1.0 - diskAlpha) * shiftColor * alpha;
+                    float heat = clamp((DISK_OUTER - diskR) / (DISK_OUTER - ISCO), 0.0, 1.0);
+                    vec3 base = mix(vec3(1.0, 0.25, 0.05), vec3(1.0, 0.86, 0.48), heat);
+                    vec3 shifted = dopplerTint(base * pow(shift, 2.4), shift);
+
+                    float alpha = clamp(density * 0.5, 0.0, 1.0);
+                    diskAccum += (1.0 - diskAlpha) * shifted * alpha;
                     diskAlpha += (1.0 - diskAlpha) * alpha;
                 }
             }
 
             pos = nextPos;
-            
-            // Escape condition (ray goes to infinity)
-            if (r > max(100.0, length(u_camPos) + 50.0)) {
-                // Background stars
-                vec3 bg = getBackground(dir);
-                
-                // Add overall doppler shift of observer
-                float shift = 1.0;
-                if (speed > 0.001) {
-                    float gamma = 1.0 / sqrt(1.0 - speed*speed);
-                    shift = 1.0 / (gamma * (1.0 - dot(dir, u_velocity)));
+
+            if (r > max(180.0, length(u_camPos) + 80.0)) {
+                vec3 bg = starfield(dir);
+                float observerShift = 1.0;
+                if (speed > 0.0005) {
+                    float gammaObs = 1.0 / sqrt(max(0.0004, 1.0 - speed * speed));
+                    observerShift = 1.0 / (gammaObs * (1.0 - dot(dir, u_velocity)));
                 }
-                
-                // Very simple color tint for redshift/blueshift of stars
-                vec3 tint = vec3(1.0);
-                if (shift > 1.1) tint = vec3(0.5, 0.8, 1.0) * shift; // Blueshift
-                else if (shift < 0.9) tint = vec3(1.0, 0.5, 0.5) * shift; // Redshift
-                
-                color = diskColorAccum + (1.0 - diskAlpha) * bg * tint * pow(shift, 2.0);
+
+                vec3 lensed = dopplerTint(bg, observerShift) * pow(observerShift, 1.6);
+                outColor = diskAccum + (1.0 - diskAlpha) * lensed;
                 break;
             }
         }
 
-        gl_FragColor = vec4(color, 1.0);
+        float vignette = smoothstep(1.15, 0.2, length(uv));
+        outColor *= vignette;
+        gl_FragColor = vec4(outColor, 1.0);
     }
 `;
 
 // -----------------------------------------------------------------------------
-// WebGL Setup routines
+// WebGL setup
 // -----------------------------------------------------------------------------
 
-function compileShader(gl, source, type) {
-    const shader = gl.createShader(type);
-    gl.shaderSource(shader, source);
-    gl.compileShader(shader);
-    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-        console.error("Shader compile error: " + gl.getShaderInfoLog(shader));
-        gl.deleteShader(shader);
+function compileShader(glCtx, source, type) {
+    const shader = glCtx.createShader(type);
+    glCtx.shaderSource(shader, source);
+    glCtx.compileShader(shader);
+    if (!glCtx.getShaderParameter(shader, glCtx.COMPILE_STATUS)) {
+        console.error('Shader compile error: ' + glCtx.getShaderInfoLog(shader));
+        glCtx.deleteShader(shader);
         return null;
     }
     return shader;
@@ -224,203 +188,246 @@ const program = gl.createProgram();
 gl.attachShader(program, vertexShader);
 gl.attachShader(program, fragmentShader);
 gl.linkProgram(program);
-
 if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    console.error("Program link error: " + gl.getProgramInfoLog(program));
+    console.error('Program link error: ' + gl.getProgramInfoLog(program));
 }
 
-const positionAttributeLocation = gl.getAttribLocation(program, "a_position");
+const positionAttributeLocation = gl.getAttribLocation(program, 'a_position');
 const positionBuffer = gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-const positions = [
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
     -1, -1,
     1, -1,
     -1, 1,
     -1, 1,
     1, -1,
     1, 1,
-];
-gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+]), gl.STATIC_DRAW);
+
+const uniformLocs = {
+    resolution: gl.getUniformLocation(program, 'u_resolution'),
+    camPos: gl.getUniformLocation(program, 'u_camPos'),
+    camForward: gl.getUniformLocation(program, 'u_camForward'),
+    camRight: gl.getUniformLocation(program, 'u_camRight'),
+    camUp: gl.getUniformLocation(program, 'u_camUp'),
+    time: gl.getUniformLocation(program, 'u_time'),
+    velocity: gl.getUniformLocation(program, 'u_velocity'),
+};
 
 // -----------------------------------------------------------------------------
-// Physics and Camera Simulation
+// Physics and free-flight controls
 // -----------------------------------------------------------------------------
 
-const RS = 1.0; // Scaled Schwarzschild radius
-const C = 10.0; // Scaled speed of light for movement purposes
+const RS = 1.0;
+const C = 1.0;
+const GM = 0.5 * RS;
 
-// Spacecraft state
-let camPos = glMatrix.vec3.fromValues(0, 2, 12); // Start tilted slightly up to see disk
-let camForward = glMatrix.vec3.fromValues(0, -0.15, -1);
-glMatrix.vec3.normalize(camForward, camForward);
-let camUp = glMatrix.vec3.fromValues(0, 1, 0);
+let camPos = glMatrix.vec3.fromValues(0.0, 1.5, 14.0);
+let camForward = glMatrix.vec3.fromValues(0.0, -0.1, -1.0);
+let camUp = glMatrix.vec3.fromValues(0.0, 1.0, 0.0);
 let camRight = glMatrix.vec3.create();
 glMatrix.vec3.cross(camRight, camForward, camUp);
+glMatrix.vec3.normalize(camForward, camForward);
 glMatrix.vec3.normalize(camRight, camRight);
 
-let velocity = glMatrix.vec3.fromValues(0, 0, 0); // physical velocity
-let acceleration = glMatrix.vec3.fromValues(0, 0, 0);
+let velocity = glMatrix.vec3.create();
+const keys = Object.create(null);
 
-// Input state
-const keys = {};
-let isDragging = false;
+let pointerLocked = false;
+let dragging = false;
 let lastMouseX = 0;
 let lastMouseY = 0;
 
-window.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
-window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
-canvas.addEventListener('mousedown', (e) => { isDragging = true; lastMouseX = e.clientX; lastMouseY = e.clientY; });
-window.addEventListener('mouseup', () => isDragging = false);
+function rebuildBasis() {
+    glMatrix.vec3.normalize(camForward, camForward);
+    glMatrix.vec3.cross(camRight, camForward, camUp);
+    glMatrix.vec3.normalize(camRight, camRight);
+    glMatrix.vec3.cross(camUp, camRight, camForward);
+    glMatrix.vec3.normalize(camUp, camUp);
+}
+
+function rotateCamera(dx, dy) {
+    const sensitivity = 0.0018;
+
+    const yaw = glMatrix.mat4.create();
+    glMatrix.mat4.rotate(yaw, yaw, -dx * sensitivity, camUp);
+    glMatrix.vec3.transformMat4(camForward, camForward, yaw);
+
+    glMatrix.vec3.cross(camRight, camForward, camUp);
+    glMatrix.vec3.normalize(camRight, camRight);
+
+    const pitch = glMatrix.mat4.create();
+    glMatrix.mat4.rotate(pitch, pitch, -dy * sensitivity, camRight);
+    const nextForward = glMatrix.vec3.create();
+    glMatrix.vec3.transformMat4(nextForward, camForward, pitch);
+
+    const verticalDot = Math.abs(glMatrix.vec3.dot(nextForward, camUp));
+    if (verticalDot < 0.995) {
+        glMatrix.vec3.copy(camForward, nextForward);
+    }
+
+    rebuildBasis();
+}
+
+window.addEventListener('keydown', (e) => {
+    const k = e.key.toLowerCase();
+    keys[k] = true;
+
+    if (k === ' ') {
+        e.preventDefault();
+    }
+});
+
+window.addEventListener('keyup', (e) => {
+    keys[e.key.toLowerCase()] = false;
+});
+
+canvas.addEventListener('click', () => {
+    if (canvas.requestPointerLock) {
+        canvas.requestPointerLock();
+    }
+});
+
+document.addEventListener('pointerlockchange', () => {
+    pointerLocked = document.pointerLockElement === canvas;
+});
+
+canvas.addEventListener('mousedown', (e) => {
+    dragging = true;
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
+});
+
+window.addEventListener('mouseup', () => {
+    dragging = false;
+});
+
 window.addEventListener('mousemove', (e) => {
-    if (!isDragging) return;
+    if (pointerLocked) {
+        rotateCamera(e.movementX, e.movementY);
+        return;
+    }
+
+    if (!dragging) return;
     const dx = e.clientX - lastMouseX;
     const dy = e.clientY - lastMouseY;
     lastMouseX = e.clientX;
     lastMouseY = e.clientY;
-
-    const sensitivity = 0.003;
-
-    // Yaw (rotate around Up)
-    const yawMat = glMatrix.mat4.create();
-    glMatrix.mat4.rotate(yawMat, yawMat, -dx * sensitivity, camUp);
-    glMatrix.vec3.transformMat4(camForward, camForward, yawMat);
-
-    // Pitch (rotate around Right)
-    glMatrix.vec3.cross(camRight, camForward, camUp);
-    glMatrix.vec3.normalize(camRight, camRight);
-    const pitchMat = glMatrix.mat4.create();
-    glMatrix.mat4.rotate(pitchMat, pitchMat, -dy * sensitivity, camRight);
-    glMatrix.vec3.transformMat4(camForward, camForward, pitchMat);
-
-    // Update Up vector to maintain orthogonality
-    glMatrix.vec3.cross(camUp, camRight, camForward);
-    glMatrix.vec3.normalize(camUp, camUp);
-
-    glMatrix.vec3.normalize(camForward, camForward);
+    rotateCamera(dx, dy);
 });
 
-// Resize handler
+// -----------------------------------------------------------------------------
+// UI
+// -----------------------------------------------------------------------------
+
+const uiDist = document.getElementById('dist-val');
+const uiVel = document.getElementById('vel-val');
+const uiTime = document.getElementById('time-val');
+const uiShift = document.getElementById('shift-val');
+const uiProper = document.getElementById('proper-val');
+const warningBanner = document.getElementById('warning-banner');
+
 function resize() {
-    const pixelRatio = window.devicePixelRatio || 1;
-    // Super-sample for maximum resolution (pushing up to 2x the native device pixels)
-    const pr = pixelRatio * 2.0;
-    canvas.width = window.innerWidth * pr;
-    canvas.height = window.innerHeight * pr;
-    canvas.style.width = window.innerWidth + 'px';
-    canvas.style.height = window.innerHeight + 'px';
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.floor(window.innerWidth * dpr);
+    canvas.height = Math.floor(window.innerHeight * dpr);
+    canvas.style.width = `${window.innerWidth}px`;
+    canvas.style.height = `${window.innerHeight}px`;
     gl.viewport(0, 0, canvas.width, canvas.height);
 }
 window.addEventListener('resize', resize);
 resize();
 
-// UI Elements
-const uiDist = document.getElementById('dist-val');
-const uiVel = document.getElementById('vel-val');
-const uiTime = document.getElementById('time-val');
-const warningBanner = document.getElementById('warning-banner');
-
 // -----------------------------------------------------------------------------
-// Main Loop
+// Main loop
 // -----------------------------------------------------------------------------
 
 let lastTime = 0;
+let accumulatedProperTime = 0;
 
 function updatePhysics(dt) {
-    // Gravitational acceleration: a = -GM/r^2. G=C=M=1 -> GM = 0.5 * rs
-    const rMag = glMatrix.vec3.length(camPos);
-    let GM = 0.5 * RS;
-    let gMag = GM / (rMag * rMag);
+    const r = glMatrix.vec3.length(camPos);
+    const radialUnit = glMatrix.vec3.create();
+    glMatrix.vec3.scale(radialUnit, camPos, 1 / Math.max(0.0001, r));
 
     const gravity = glMatrix.vec3.create();
-    glMatrix.vec3.scale(gravity, camPos, -gMag / rMag);
+    const gMag = GM / Math.max(0.02, r * r);
+    glMatrix.vec3.scale(gravity, radialUnit, -gMag);
 
-    // Thruster acceleration
     const thrust = glMatrix.vec3.create();
-    const thrustPower = 2.0;
+    const thrustPower = 0.9;
+    if (keys.w) glMatrix.vec3.scaleAndAdd(thrust, thrust, camForward, thrustPower);
+    if (keys.s) glMatrix.vec3.scaleAndAdd(thrust, thrust, camForward, -thrustPower);
+    if (keys.a) glMatrix.vec3.scaleAndAdd(thrust, thrust, camRight, -thrustPower);
+    if (keys.d) glMatrix.vec3.scaleAndAdd(thrust, thrust, camRight, thrustPower);
+    if (keys.q) glMatrix.vec3.scaleAndAdd(thrust, thrust, camUp, thrustPower);
+    if (keys.e) glMatrix.vec3.scaleAndAdd(thrust, thrust, camUp, -thrustPower);
 
-    if (keys['w']) glMatrix.vec3.scaleAndAdd(thrust, thrust, camForward, thrustPower);
-    if (keys['r']) glMatrix.vec3.scaleAndAdd(thrust, thrust, camForward, -thrustPower);
-    if (keys['a']) glMatrix.vec3.scaleAndAdd(thrust, thrust, camRight, -thrustPower);
-    if (keys['s']) glMatrix.vec3.scaleAndAdd(thrust, thrust, camRight, thrustPower);
+    const totalAccel = glMatrix.vec3.create();
+    glMatrix.vec3.add(totalAccel, gravity, thrust);
 
-    // Combine forces
-    glMatrix.vec3.add(acceleration, gravity, thrust);
+    glMatrix.vec3.scaleAndAdd(velocity, velocity, totalAccel, dt);
 
-    // Update velocity
-    glMatrix.vec3.scaleAndAdd(velocity, velocity, acceleration, dt);
-
-    // Speed limit (restrict to < C)
     const speed = glMatrix.vec3.length(velocity);
-    if (speed > C * 0.99) {
-        glMatrix.vec3.scale(velocity, velocity, (C * 0.99) / speed);
+    if (speed > 0.995 * C) {
+        glMatrix.vec3.scale(velocity, velocity, (0.995 * C) / speed);
     }
 
-    // Update position
     glMatrix.vec3.scaleAndAdd(camPos, camPos, velocity, dt);
 
-    // Relativistic calculations for HUD
-    const r = glMatrix.vec3.length(camPos);
-
-    // Prevent falling inside completely (numerical instability in simple Euler)
-    if (r < RS * 1.01) {
-        glMatrix.vec3.scale(camPos, camPos, (RS * 1.01) / r);
-        glMatrix.vec3.set(velocity, 0, 0, 0);
+    const newR = glMatrix.vec3.length(camPos);
+    if (newR <= RS * 1.003) {
+        const safeScale = (RS * 1.003) / Math.max(0.0001, newR);
+        glMatrix.vec3.scale(camPos, camPos, safeScale);
+        glMatrix.vec3.scale(velocity, velocity, 0.4);
     }
 
-    const timeDilation = Math.sqrt(Math.max(0.001, 1.0 - RS / r));
-    const speedPercent = (speed / C) * 100;
+    const vFrac = Math.min(0.999, glMatrix.vec3.length(velocity) / C);
+    const gamma = 1 / Math.sqrt(Math.max(0.001, 1 - vFrac * vFrac));
+    const gravFactor = Math.sqrt(Math.max(0.001, 1 - RS / glMatrix.vec3.length(camPos)));
+    const dTauDt = gravFactor / gamma;
+    accumulatedProperTime += dt * dTauDt;
 
-    // Update HUD
-    uiDist.textContent = (r / RS).toFixed(3);
-    uiVel.textContent = speedPercent.toFixed(1);
-    uiTime.textContent = timeDilation.toFixed(4);
+    uiDist.textContent = (glMatrix.vec3.length(camPos) / RS).toFixed(3);
+    uiVel.textContent = (vFrac * 100).toFixed(2);
+    uiTime.textContent = dTauDt.toFixed(4);
+    uiShift.textContent = (1 / Math.max(0.001, dTauDt)).toFixed(3);
+    uiProper.textContent = accumulatedProperTime.toFixed(2);
 
-    if (r < RS * 1.5) {
+    if (glMatrix.vec3.length(camPos) < RS * 1.6) {
         warningBanner.classList.remove('hidden');
     } else {
         warningBanner.classList.add('hidden');
     }
 }
 
-function render(time) {
-    time *= 0.001; // convert to seconds
-    const dt = Math.min(time - lastTime, 0.1); // cap dt to prevent huge jumps
+function render(timestamp) {
+    const time = timestamp * 0.001;
+    const dt = Math.min(0.05, Math.max(0.0, time - lastTime));
     lastTime = time;
 
     updatePhysics(dt);
 
     gl.useProgram(program);
-
     gl.enableVertexAttribArray(positionAttributeLocation);
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
     gl.vertexAttribPointer(positionAttributeLocation, 2, gl.FLOAT, false, 0, 0);
 
-    const resLoc = gl.getUniformLocation(program, "u_resolution");
-    const camPosLoc = gl.getUniformLocation(program, "u_camPos");
-    const camFwdLoc = gl.getUniformLocation(program, "u_camForward");
-    const camRightLoc = gl.getUniformLocation(program, "u_camRight");
-    const camUpLoc = gl.getUniformLocation(program, "u_camUp");
-    const timeLoc = gl.getUniformLocation(program, "u_time");
-    const velLoc = gl.getUniformLocation(program, "u_velocity");
+    gl.uniform2f(uniformLocs.resolution, canvas.width, canvas.height);
+    gl.uniform3f(uniformLocs.camPos, camPos[0], camPos[1], camPos[2]);
+    gl.uniform3f(uniformLocs.camForward, camForward[0], camForward[1], camForward[2]);
+    gl.uniform3f(uniformLocs.camRight, camRight[0], camRight[1], camRight[2]);
+    gl.uniform3f(uniformLocs.camUp, camUp[0], camUp[1], camUp[2]);
+    gl.uniform1f(uniformLocs.time, time);
 
-    gl.uniform2f(resLoc, canvas.width, canvas.height);
-    gl.uniform3f(camPosLoc, camPos[0], camPos[1], camPos[2]);
-    gl.uniform3f(camFwdLoc, camForward[0], camForward[1], camForward[2]);
-    gl.uniform3f(camRightLoc, camRight[0], camRight[1], camRight[2]);
-    gl.uniform3f(camUpLoc, camUp[0], camUp[1], camUp[2]);
-    gl.uniform1f(timeLoc, time);
-
-    // Pass velocity scaled to [0, 1) for shader doppler effects
-    const shaderVel = [velocity[0] / C, velocity[1] / C, velocity[2] / C];
-    gl.uniform3f(velLoc, shaderVel[0], shaderVel[1], shaderVel[2]);
+    const beta = [velocity[0] / C, velocity[1] / C, velocity[2] / C];
+    gl.uniform3f(uniformLocs.velocity, beta[0], beta[1], beta[2]);
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
-
     requestAnimationFrame(render);
 }
 
-// Start simulation
-requestAnimationFrame((time) => {
-    lastTime = time * 0.001;
+requestAnimationFrame((t) => {
+    lastTime = t * 0.001;
     requestAnimationFrame(render);
 });
