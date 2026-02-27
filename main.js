@@ -31,7 +31,7 @@ const fsSource = `
 
     varying vec2 v_uv;
 
-    const int MAX_STEPS = 900;
+    const int MAX_STEPS = 700;
     const float RS = 1.0;
     const float ISCO = 3.0;
     const float DISK_OUTER = 18.0;
@@ -53,36 +53,13 @@ const fsSource = `
                 mix(hash(p + vec3(0.0, 1.0, 1.0)), hash(p + vec3(1.0, 1.0, 1.0)), f.x), f.y), f.z);
     }
 
-    float fbm(vec3 p) {
-        float sum = 0.0;
-        float amp = 0.55;
-        for (int i = 0; i < 4; i++) {
-            sum += noise(p) * amp;
-            p *= 2.03;
-            amp *= 0.5;
-        }
-        return sum;
-    }
-
     vec3 starfield(vec3 dir) {
-        vec3 d = normalize(dir);
-        float coarse = fbm(d * 36.0);
-        float medium = fbm(d * 95.0);
-        float tiny = pow(noise(d * 420.0), 38.0) * 1.8;
-        float bright = pow(noise(d * 900.0), 72.0) * 7.0;
+        float milky = smoothstep(0.35, 0.9, noise(dir * 18.0));
+        vec3 dust = vec3(0.07, 0.11, 0.2) * milky;
 
-        // Keep space mostly black and avoid blue/gray blocks.
-        vec3 deepSpace = vec3(0.0015, 0.0018, 0.0024);
-
-        // Very subtle warm nebula haze to prevent blocky patches.
-        float haze = smoothstep(0.55, 0.95, coarse) * 0.05 + smoothstep(0.7, 0.97, medium) * 0.03;
-        vec3 nebula = vec3(0.04, 0.025, 0.02) * haze;
-
-        // Sparse stars with mild color variation.
-        vec3 stars = vec3(tiny + bright);
-        stars *= mix(vec3(0.8, 0.85, 1.0), vec3(1.0, 0.95, 0.85), smoothstep(0.2, 0.8, medium));
-
-        return deepSpace + nebula + stars;
+        float sparkle = pow(noise(dir * 280.0), 42.0) * 8.0;
+        float giant = pow(noise(dir * 75.0), 25.0) * 1.8;
+        return dust + vec3(sparkle + giant);
     }
 
     vec3 dopplerTint(vec3 c, float shift) {
@@ -131,7 +108,7 @@ const fsSource = `
             float L2 = dot(L, L);
             vec3 accel = -1.5 * RS * L2 * pos / max(0.0001, (r2 * r2 * r));
 
-            float stepScale = clamp(0.017 * r + 0.012, 0.012, 0.14);
+            float stepScale = clamp(0.025 * r + 0.02, 0.02, 0.22);
             dir = normalize(dir + accel * stepScale);
             vec3 nextPos = pos + dir * stepScale;
 
@@ -149,20 +126,18 @@ const fsSource = `
                     float shift = D * grav;
 
                     float angle = atan(hitPos.z, hitPos.x);
-                    float armA = sin(angle * 22.0 - log(diskR + 1.0) * 16.0);
-                    float armB = sin(angle * 14.0 - log(diskR + 1.0) * 10.0 + 0.7);
-                    float spiral = 0.5 + 0.25 * armA + 0.25 * armB;
-                    float turbulence = fbm(vec3(hitPos.xz * 2.2, 0.0));
+                    float swirl = sin(angle * 16.0 - u_time * 4.0 * vk) * 0.5 + 0.5;
+                    float turbulence = noise(vec3(hitPos.xz * 1.3, u_time * 0.15));
                     float density = smoothstep(ISCO, ISCO + 0.6, diskR)
                         * (1.0 - smoothstep(DISK_OUTER - 2.5, DISK_OUTER, diskR))
-                        * (0.7 + 0.55 * spiral)
-                        * (0.7 + 0.5 * turbulence);
+                        * (0.45 + 0.9 * swirl)
+                        * (0.6 + turbulence);
 
                     float heat = clamp((DISK_OUTER - diskR) / (DISK_OUTER - ISCO), 0.0, 1.0);
                     vec3 base = mix(vec3(1.0, 0.25, 0.05), vec3(1.0, 0.86, 0.48), heat);
                     vec3 shifted = dopplerTint(base * pow(shift, 2.4), shift);
 
-                    float alpha = clamp(density * 0.42, 0.0, 1.0);
+                    float alpha = clamp(density * 0.5, 0.0, 1.0);
                     diskAccum += (1.0 - diskAlpha) * shifted * alpha;
                     diskAlpha += (1.0 - diskAlpha) * alpha;
                 }
