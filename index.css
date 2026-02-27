@@ -44,7 +44,7 @@ body, html {
 .top-left {
     top: 30px;
     left: 30px;
-    min-width: 250px;
+    min-width: 300px;
 }
 
 .bottom-left {
@@ -145,4 +145,14 @@ h3 {
     color: rgba(0, 255, 255, 0.5);
     font-size: 24px;
     pointer-events: none;
+}
+
+#hud::after {
+    content: "Click to capture mouse for free flight";
+    position: absolute;
+    right: 24px;
+    bottom: 24px;
+    font-size: 0.85rem;
+    color: rgba(150, 255, 255, 0.7);
+    text-shadow: 0 0 6px rgba(0, 255, 255, 0.35);
 }
