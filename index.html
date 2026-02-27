@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
@@ -16,7 +16,7 @@
         <div class="panel top-left">
             <h2>SPACECRAFT TELEMETRY</h2>
             <div class="data-row">
-                <span class="label">DISTANCE (r_s):</span>
+                <span class="label">DISTANCE (rₛ):</span>
                 <span class="value" id="dist-val">10.000</span>
             </div>
             <div class="data-row">
@@ -24,41 +24,37 @@
                 <span class="value" id="vel-val">0.000</span>
             </div>
             <div class="data-row">
-                <span class="label">TIME DILATION:</span>
-                <span class="value" id="time-val">1.000</span>
+                <span class="label">dτ/dt:</span>
+                <span class="value" id="time-val">1.0000</span>
+            </div>
+            <div class="data-row">
+                <span class="label">TIME SHIFT (dt/dτ):</span>
+                <span class="value" id="shift-val">1.000</span>
+            </div>
+            <div class="data-row">
+                <span class="label">PROPER TIME (s):</span>
+                <span class="value" id="proper-val">0.00</span>
             </div>
         </div>
 
         <div class="panel bottom-left controls">
             <h3>FLIGHT CONTROLS</h3>
             <ul>
-                <li><span>W / R</span><span>Main Thrusters (Forward/Backward)</span></li>
-                <li><span>A / S</span><span>Angular Thrusters (Strafe)</span></li>
-                <li><span>Mouse</span><span>Attitude Control (Drag to Look)</span></li>
+                <li><span>Click / Esc</span><span>Capture or release pointer lock</span></li>
+                <li><span>W / S</span><span>Forward / backward thrust</span></li>
+                <li><span>A / D</span><span>Lateral strafing thrusters</span></li>
+                <li><span>Q / E</span><span>Vertical lift / dive thrusters</span></li>
+                <li><span>Mouse</span><span>Freelook (or drag if unlocked)</span></li>
             </ul>
         </div>
 
         <div id="warning-banner" class="hidden">
-            WARNING: APPROACHING EVENT HORIZON
+            WARNING: EXTREME GRAVITATIONAL GRADIENT
         </div>
 
         <div id="crosshair">+</div>
     </div>
 
-    <script>
-        window.onerror = function (msg, url, line, col, error) {
-            const errDiv = document.createElement('div');
-            errDiv.style.position = 'absolute';
-            errDiv.style.top = '10px';
-            errDiv.style.right = '10px';
-            errDiv.style.color = 'red';
-            errDiv.style.backgroundColor = 'black';
-            errDiv.style.padding = '10px';
-            errDiv.style.zIndex = '9999';
-            errDiv.innerText = msg + ' at ' + line + ':' + col;
-            document.body.appendChild(errDiv);
-        };
-    </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gl-matrix/3.4.1/gl-matrix-min.js"></script>
     <script src="main.js"></script>
 </body>
