@@ -148,7 +148,7 @@ h3 {
 }
 
 #hud::after {
-    content: "Click to capture mouse for free flight";
+    content: "Click to lock mouse (or drag to look)";
     position: absolute;
     right: 24px;
     bottom: 24px;

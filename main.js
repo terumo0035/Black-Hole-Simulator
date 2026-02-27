@@ -234,6 +234,9 @@ let velocity = glMatrix.vec3.create();
 const keys = Object.create(null);
 
 let pointerLocked = false;
+let dragging = false;
+let lastMouseX = 0;
+let lastMouseY = 0;
 
 function rebuildBasis() {
     glMatrix.vec3.normalize(camForward, camForward);
@@ -280,16 +283,37 @@ window.addEventListener('keyup', (e) => {
 });
 
 canvas.addEventListener('click', () => {
-    canvas.requestPointerLock();
+    if (canvas.requestPointerLock) {
+        canvas.requestPointerLock();
+    }
 });
 
 document.addEventListener('pointerlockchange', () => {
     pointerLocked = document.pointerLockElement === canvas;
 });
 
+canvas.addEventListener('mousedown', (e) => {
+    dragging = true;
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
+});
+
+window.addEventListener('mouseup', () => {
+    dragging = false;
+});
+
 window.addEventListener('mousemove', (e) => {
-    if (!pointerLocked) return;
-    rotateCamera(e.movementX, e.movementY);
+    if (pointerLocked) {
+        rotateCamera(e.movementX, e.movementY);
+        return;
+    }
+
+    if (!dragging) return;
+    const dx = e.clientX - lastMouseX;
+    const dy = e.clientY - lastMouseY;
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
+    rotateCamera(dx, dy);
 });
 
 // -----------------------------------------------------------------------------
