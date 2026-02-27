@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Relativistic Black Hole Simulation</title>
+    <title>Sagittarius A* Flight Simulator</title>
     <link rel="stylesheet" href="index.css">
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
 </head>
@@ -14,10 +14,22 @@
 
     <div id="hud">
         <div class="panel top-left">
-            <h2>SPACECRAFT TELEMETRY</h2>
+            <h2>SAGITTARIUS A* TELEMETRY</h2>
             <div class="data-row">
-                <span class="label">DISTANCE (rₛ):</span>
+                <span class="label">MASS (M☉):</span>
+                <span class="value" id="mass-val">4.154e6</span>
+            </div>
+            <div class="data-row">
+                <span class="label">SPIN (a*):</span>
+                <span class="value" id="spin-val">0.72</span>
+            </div>
+            <div class="data-row">
+                <span class="label">DISTANCE TO CENTER (R_S):</span>
                 <span class="value" id="dist-val">10.000</span>
+            </div>
+            <div class="data-row">
+                <span class="label">DISTANCE TO HORIZON (R_S):</span>
+                <span class="value" id="dist-horizon-val">0.000</span>
             </div>
             <div class="data-row">
                 <span class="label">VELOCITY (%c):</span>
@@ -41,11 +53,24 @@
             <h3>FLIGHT CONTROLS</h3>
             <ul>
                 <li><span>Click / Esc</span><span>Capture or release pointer lock</span></li>
-                <li><span>W / S</span><span>Forward / backward thrust</span></li>
-                <li><span>A / D</span><span>Lateral strafing thrusters</span></li>
+                <li><span>W / R</span><span>Forward / backward thrust</span></li>
+                <li><span>A / S</span><span>Lateral strafing thrusters</span></li>
                 <li><span>Q / E</span><span>Vertical lift / dive thrusters</span></li>
                 <li><span>Mouse</span><span>Freelook (or drag if unlocked)</span></li>
             </ul>
+            <button id="fix-toggle" type="button">FIX: OFF</button>
+            <div class="transport-controls">
+                <label for="transport-rs-input">Jump from horizon (R_S)</label>
+                <div class="transport-row">
+                    <input id="transport-rs-input" type="number" min="0" step="0.001" placeholder="e.g. 2.5">
+                    <button id="transport-btn" type="button">TRANSPORT</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel bottom-right clock-panel">
+            <h3>COORDINATE TIME</h3>
+            <div class="clock-readout" id="coord-clock">00:00:00</div>
         </div>
 
         <div id="warning-banner" class="hidden">

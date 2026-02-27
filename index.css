@@ -52,6 +52,23 @@ body, html {
     left: 30px;
 }
 
+.bottom-right {
+    bottom: 30px;
+    right: 30px;
+}
+
+.clock-panel {
+    min-width: 220px;
+    text-align: center;
+}
+
+.clock-readout {
+    font-size: 1.8rem;
+    letter-spacing: 2px;
+    color: #b8ffff;
+    text-shadow: 0 0 8px rgba(0, 255, 255, 0.6);
+}
+
 h2, h3 {
     margin-top: 0;
     margin-bottom: 15px;
@@ -94,6 +111,10 @@ h3 {
     margin: 0;
 }
 
+.controls {
+    pointer-events: auto;
+}
+
 .controls li {
     display: flex;
     justify-content: space-between;
@@ -109,6 +130,71 @@ h3 {
     border-radius: 4px;
     border: 1px solid rgba(0, 255, 255, 0.4);
     font-size: 0.8rem;
+}
+
+#fix-toggle {
+    margin-top: 12px;
+    width: 100%;
+    background: rgba(0, 255, 255, 0.16);
+    color: #d9ffff;
+    border: 1px solid rgba(0, 255, 255, 0.55);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    letter-spacing: 1px;
+    cursor: pointer;
+}
+
+#fix-toggle.active {
+    background: rgba(70, 255, 150, 0.2);
+    border-color: rgba(120, 255, 180, 0.7);
+    color: #e8fff3;
+}
+
+.transport-controls {
+    margin-top: 12px;
+}
+
+.transport-controls label {
+    display: block;
+    font-size: 0.78rem;
+    letter-spacing: 0.6px;
+    opacity: 0.85;
+    margin-bottom: 6px;
+}
+
+.transport-row {
+    display: flex;
+    gap: 8px;
+}
+
+#transport-rs-input {
+    flex: 1;
+    background: rgba(0, 20, 40, 0.9);
+    color: #d9ffff;
+    border: 1px solid rgba(0, 255, 255, 0.45);
+    border-radius: 6px;
+    padding: 8px 9px;
+    font-family: inherit;
+    font-size: 0.85rem;
+    outline: none;
+}
+
+#transport-rs-input:focus {
+    border-color: rgba(120, 255, 255, 0.9);
+}
+
+#transport-btn {
+    background: rgba(0, 255, 255, 0.16);
+    color: #d9ffff;
+    border: 1px solid rgba(0, 255, 255, 0.55);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-family: inherit;
+    font-size: 0.78rem;
+    letter-spacing: 0.8px;
+    cursor: pointer;
 }
 
 #warning-banner {
@@ -151,7 +237,7 @@ h3 {
     content: "Click to lock mouse (or drag to look)";
     position: absolute;
     right: 24px;
-    bottom: 24px;
+    bottom: 130px;
     font-size: 0.85rem;
     color: rgba(150, 255, 255, 0.7);
     text-shadow: 0 0 6px rgba(0, 255, 255, 0.35);

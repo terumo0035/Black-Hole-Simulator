@@ -1,9 +1,10 @@
-# Black Hole Simulator
+# Sagittarius A* Flight Simulator
 
 A browser-based black hole flight simulator with a GR-inspired rendering model:
 - Schwarzschild-like light bending
 - accretion disk Doppler/gravitational shifting
 - relativistic aberration and time-dilation telemetry
+- Sagittarius A* mass context (`4.154e6` solar masses) with AU distance readout
 
 ## How to test locally
 
@@ -24,8 +25,8 @@ In your browser, open:
 - Press `Esc` to release the pointer.
 
 ### 4) Fly around the black hole
-- `W / S`: forward / backward thrust
-- `A / D`: strafe left / right
+- `W / R`: forward / backward thrust
+- `A / S`: strafe left / right
 - `Q / E`: up / down thrust
 - Mouse move: look around
 
