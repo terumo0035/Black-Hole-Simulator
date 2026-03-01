@@ -177,6 +177,80 @@ h3 {
     margin-top: 12px;
 }
 
+.keybind-controls {
+    margin-top: 12px;
+}
+
+#keybind-toggle {
+    width: 100%;
+    background: rgba(0, 255, 255, 0.16);
+    color: #d9ffff;
+    border: 1px solid rgba(0, 255, 255, 0.55);
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-family: inherit;
+    font-size: 0.78rem;
+    letter-spacing: 0.9px;
+    cursor: pointer;
+    text-align: left;
+}
+
+#keybind-toggle::after {
+    content: " [+]";
+}
+
+#keybind-toggle[aria-expanded="true"]::after {
+    content: " [-]";
+}
+
+#keybind-panel {
+    margin-top: 8px;
+}
+
+#keybind-panel.collapsed {
+    display: none;
+}
+
+.keybind-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 6px;
+    font-size: 0.8rem;
+}
+
+.keybind-row button,
+#bind-reset {
+    background: rgba(0, 255, 255, 0.16);
+    color: #d9ffff;
+    border: 1px solid rgba(0, 255, 255, 0.55);
+    border-radius: 6px;
+    padding: 5px 8px;
+    font-family: inherit;
+    font-size: 0.75rem;
+    letter-spacing: 0.8px;
+    cursor: pointer;
+}
+
+.keybind-row button.pending {
+    background: rgba(255, 180, 70, 0.24);
+    border-color: rgba(255, 190, 90, 0.85);
+    color: #fff5d8;
+}
+
+#bind-reset {
+    width: 100%;
+    margin-top: 2px;
+}
+
+#keybind-status {
+    margin-top: 8px;
+    font-size: 0.72rem;
+    color: rgba(175, 255, 255, 0.82);
+    min-height: 16px;
+}
+
 .disc-controls {
     margin-top: 12px;
 }
@@ -280,7 +354,8 @@ h3 {
 
 #disc-intensity-slider,
 #disc-temp-slider,
-#disc-thickness-slider {
+#disc-thickness-slider,
+#disc-density-slider {
     width: 100%;
     accent-color: #66f0ff;
     margin-bottom: 8px;
@@ -288,7 +363,8 @@ h3 {
 
 #disc-intensity-input,
 #disc-temp-input,
-#disc-thickness-input {
+#disc-thickness-input,
+#disc-density-input {
     width: 100%;
     background: rgba(0, 20, 40, 0.9);
     color: #d9ffff;
@@ -304,7 +380,8 @@ h3 {
 
 #disc-intensity-input:focus,
 #disc-temp-input:focus,
-#disc-thickness-input:focus {
+#disc-thickness-input:focus,
+#disc-density-input:focus {
     border-color: rgba(120, 255, 255, 0.9);
 }
 
@@ -426,7 +503,7 @@ h3 {
 }
 
 #hud::after {
-    content: "Click to lock mouse (or drag to look)";
+    content: "";
     position: absolute;
     right: 24px;
     bottom: 130px;

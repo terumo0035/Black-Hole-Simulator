@@ -17,7 +17,7 @@
             <h2>BLACK HOLE TELEMETRY</h2>
             <div class="data-row">
                 <span class="label">MASS (M☉):</span>
-                <span class="value" id="mass-val">4.154e6</span>
+                <span class="value" id="mass-val">7.000e6</span>
             </div>
             <div class="data-row">
                 <span class="label">SPIN (a*):</span>
@@ -29,7 +29,7 @@
             </div>
             <div class="data-row">
                 <span class="label">DISTANCE TO CENTER (R_S):</span>
-                <span class="value" id="dist-val">10.000</span>
+                <span class="value" id="dist-val">20.000</span>
             </div>
             <div class="data-row">
                 <span class="label">DISTANCE TO HORIZON (R_S):</span>
@@ -56,18 +56,18 @@
         <div class="panel bottom-left controls">
             <h3>FLIGHT CONTROLS</h3>
             <ul>
-                <li><span>Click / Esc</span><span>Capture or release pointer lock</span></li>
-                <li><span>W / R</span><span>Forward / backward thrust</span></li>
-                <li><span>A / S</span><span>Lateral strafing thrusters</span></li>
-                <li><span>Q / F</span><span>Vertical lift / dive thrusters</span></li>
-                <li><span>Mouse</span><span>Freelook (or drag if unlocked)</span></li>
+                <li><span>Hold LMB</span><span>Lock mouse and freelook</span></li>
+                <li><span>W / S</span><span>Forward / backward thrust</span></li>
+                <li><span>A / D</span><span>Lateral strafing thrusters</span></li>
+                <li><span>Q / E</span><span>Vertical lift / dive thrusters</span></li>
+                <li><span>Release LMB</span><span>Unlock mouse</span></li>
             </ul>
             <button id="fix-toggle" type="button">FIX: OFF</button>
             <button id="brake-btn" type="button">BRAKE</button>
             <div class="mass-controls">
                 <label for="mass-slider">Mass (M☉)</label>
-                <input id="mass-slider" type="range" min="1000000" max="10000000" step="10000" value="4154000">
-                <input id="mass-input" type="number" min="1000000" max="10000000" step="10000" value="4154000">
+                <input id="mass-slider" type="range" min="1000000" max="10000000" step="10000" value="7000000">
+                <input id="mass-input" type="number" min="1000000" max="10000000" step="10000" value="7000000">
             </div>
             <div class="spin-controls">
                 <label for="spin-slider">Kerr spin a* (-0.999 to 0.999)</label>
@@ -79,6 +79,19 @@
                 <div class="transport-row">
                     <input id="transport-rs-input" type="number" min="0" step="0.001" placeholder="e.g. 2.5">
                     <button id="transport-btn" type="button">TRANSPORT</button>
+                </div>
+            </div>
+            <div class="keybind-controls">
+                <button id="keybind-toggle" type="button" aria-expanded="false">KEY BINDINGS</button>
+                <div id="keybind-panel" class="collapsed">
+                    <div class="keybind-row"><span>Forward</span><button id="bind-forward" type="button">W</button></div>
+                    <div class="keybind-row"><span>Backward</span><button id="bind-backward" type="button">S</button></div>
+                    <div class="keybind-row"><span>Left</span><button id="bind-left" type="button">A</button></div>
+                    <div class="keybind-row"><span>Right</span><button id="bind-right" type="button">D</button></div>
+                    <div class="keybind-row"><span>Lift</span><button id="bind-lift" type="button">Q</button></div>
+                    <div class="keybind-row"><span>Dive</span><button id="bind-dive" type="button">E</button></div>
+                    <button id="bind-reset" type="button">RESET BINDINGS</button>
+                    <div id="keybind-status">Click a binding button, then press a key.</div>
                 </div>
             </div>
         </div>
@@ -97,8 +110,11 @@
                 <input id="disc-temp-slider" type="range" min="0" max="1" step="0.01" value="0.62">
                 <input id="disc-temp-input" type="number" min="0" max="1" step="0.01" value="0.62">
                 <label for="disc-thickness-slider">Disc thickness (R_S)</label>
-                <input id="disc-thickness-slider" type="range" min="0.005" max="0.220" step="0.001" value="0.055">
-                <input id="disc-thickness-input" type="number" min="0.005" max="0.220" step="0.001" value="0.055">
+                <input id="disc-thickness-slider" type="range" min="0.005" max="0.500" step="0.001" value="0.220">
+                <input id="disc-thickness-input" type="number" min="0.005" max="0.500" step="0.001" value="0.220">
+                <label for="disc-density-slider">Disc density</label>
+                <input id="disc-density-slider" type="range" min="0.10" max="3.00" step="0.01" value="1.00">
+                <input id="disc-density-input" type="number" min="0.10" max="3.00" step="0.01" value="1.00">
             </div>
         </div>
 
@@ -113,17 +129,10 @@
 
         <div id="horizon-education" class="hidden">
             <div class="education-card">
-                <h3>Event Horizon Reached</h3>
-                <p>You have touched the event horizon. The simulation is now paused.</p>
-                <p>
-                    In general relativity, crossing the horizon is locally uneventful for a falling observer,
-                    but all future-directed paths lead deeper inward. No signal from inside can return to the
-                    outside universe.
-                </p>
-                <p>
-                    For a distant observer, your clock appears increasingly slowed and redshifted near the
-                    horizon. For your own proper time, continuing inward to the singular region happens in finite time.
-                </p>
+                <h3 id="ending-title">Simulation Ended</h3>
+                <p id="ending-line-1">The simulation has paused.</p>
+                <p id="ending-line-2"></p>
+                <p id="ending-line-3"></p>
                 <button id="restart-btn" type="button">Restart Simulation</button>
             </div>
         </div>

@@ -1,50 +1,89 @@
 # Black Hole Flight Simulator
 
-A browser-based Kerr black hole flight simulator with live mass and spin control:
-- Kerr horizon radius from `a*` (`r+ = M + sqrt(M^2 - a^2)`)
-- frame-dragging term coupled into both camera motion and light-bending integration
-- thin equatorial accretion disk with ISCO inner edge, turbulence, Doppler beaming, and gravitational shifts
-- relativistic aberration + Doppler shift + gravitational shift
-- time dilation telemetry via local lapse and Lorentz factor (`dτ/dt = α/γ`)
-- mass can be adjusted in real time (`1e6` to `1e7` solar masses)
+A browser-based Kerr black hole flight simulator (static HTML/CSS/JS) with real-time flight controls, relativistic rendering, and educational end-scene messaging.
 
-## How to test locally
+## Current highlights
 
-### 1) Start a local web server
-From this folder:
+- Kerr geometry-inspired motion and light-bending visuals
+- Frame dragging contribution in camera dynamics and ray integration
+- Accretion disc with:
+  - spin-direction-dependent rotation
+  - cloud-wave texture flow
+  - Doppler/beaming/gravitational color shifts
+  - runtime controls for intensity, temperature tint, thickness, and density
+- Real-time telemetry:
+  - distance to center (`R_S`)
+  - distance to horizon (`R_S`)
+  - velocity (`%c`)
+  - `dτ/dt`, `dt/dτ`
+  - proper-time and coordinate-time clock
+- Configurable key bindings (with local persistence)
+- Ending scene when:
+  - event horizon is reached
+  - or `dτ/dt < 0.1`
+
+## Startup defaults
+
+- Mass: `7,000,000 M☉`
+- Starting radius: `20 R_S`
+- Starting position: slightly above disc plane
+- Disc defaults:
+  - thickness: `0.220`
+  - density: `1.00`
+
+## Run locally
+
+From project root:
 
 ```bash
 python3 -m http.server 4173
 ```
 
-### 2) Open the simulator
-In your browser, open:
+Open:
 
 - `http://localhost:4173`
 
-### 3) Enter flight mode
-- Click the canvas to lock the mouse pointer (cockpit free-look).
-- Press `Esc` to release the pointer.
+## Controls
 
-### 4) Fly around the black hole
-- `W / R`: forward / backward thrust
-- `A / S`: strafe left / right
-- `Q / F`: up / down thrust
-- Mouse move: look around
-- Use the `Mass (M☉)` slider or numeric input to change mass in real time.
-- Use the `Kerr spin a*` slider or numeric input to freely change spin in real time.
-- `Jump from horizon (R_S)` inserts you into a fixed-radius prograde orbit lock.
+### Mouse look
 
-### 5) What to verify
-- As you approach the hole, the warning banner appears.
-- Near the hole, `dτ/dt` decreases and `dt/dτ` increases.
-- Fast motion changes scene color/intensity due to relativistic Doppler shift.
-- Looking near the black hole edge shows strong lensing distortion.
+- Hold left mouse button: lock pointer and freelook
+- Release left mouse button: unlock pointer
+
+### Flight controls (default bindings)
+
+- `W / S`: forward / backward
+- `A / D`: strafe left / right
+- `Q / E`: lift / dive
+
+### In-app binding configuration
+
+- Open `KEY BINDINGS` in the flight panel
+- Click an action button, then press a key to rebind
+- `Esc` cancels a pending rebind
+- `RESET BINDINGS` restores defaults
+- Bindings are saved to `localStorage` (`bhsim_key_bindings_v1`)
+
+## UI panels
+
+- **Flight controls panel**:
+  - FIX mode toggle
+  - BRAKE
+  - mass + spin controls
+  - jump from horizon (`R_S`)
+  - expandable key-binding settings
+- **Accretion disc panel**:
+  - enable/disable
+  - intensity
+  - temperature tint
+  - thickness
+  - density
 
 ## Notes
-- This project is static HTML/CSS/JS and requires no build step.
-- If pointer lock is unavailable in your browser, hold left mouse button and drag to look (fallback mode).
-- Mass is clamped to `[1e6, 1e7]` solar masses.
-- `a*` is clamped to `[-0.999, 0.999]`.
-- Jump targets at or inside prograde ISCO are blocked.
-- User thrust is modeled as rocket proper acceleration in a local ZAMO-like frame.
+
+- Mass range: `[1e6, 1e7] M☉`
+- Spin range: `[-0.999, 0.999]`
+- Disc thickness range: `[0.005, 0.500] R_S`
+- Disc density range: `[0.10, 3.00]`
+- Jump targets at/inside prograde ISCO are blocked
+- No build step required (pure static frontend)

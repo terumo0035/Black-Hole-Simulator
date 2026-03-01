@@ -12,6 +12,9 @@ if (!gl) {
 const REFERENCE_MASS_SOLAR = 4.154e6;
 const REFERENCE_M_SIM = 0.5; // reference geometric mass used at REFERENCE_MASS_SOLAR
 const INITIAL_SPIN_ASTAR = 0.6;
+const INITIAL_MASS_SOLAR = 7e6;
+const INITIAL_DISTANCE_RS = 20.0;
+const INITIAL_HEIGHT_ABOVE_DISC_RS = 3;
 const PHYSICS_MODE = 'kerr-geodesic';
 
 // -----------------------------------------------------------------------------
@@ -43,6 +46,7 @@ const fsSource = `
     uniform float u_discIntensity;
     uniform float u_discTemp;
     uniform float u_discThickness;
+    uniform float u_discDensity;
     uniform float u_discInner;
     uniform float u_discOuter;
 
@@ -65,6 +69,46 @@ const fsSource = `
                 mix(hash(p + vec3(0.0, 1.0, 0.0)), hash(p + vec3(1.0, 1.0, 0.0)), f.x), f.y),
             mix(mix(hash(p + vec3(0.0, 0.0, 1.0)), hash(p + vec3(1.0, 0.0, 1.0)), f.x),
                 mix(hash(p + vec3(0.0, 1.0, 1.0)), hash(p + vec3(1.0, 1.0, 1.0)), f.x), f.y), f.z);
+    }
+
+    float fbm(vec3 x) {
+        float v = 0.0;
+        float a = 0.5;
+        vec3 p = x;
+        for (int i = 0; i < 5; i++) {
+            v += a * noise(p);
+            p = p * 2.05 + vec3(11.7, -4.3, 6.1);
+            a *= 0.5;
+        }
+        return v;
+    }
+
+    float discCloudWaves(vec3 hitPos, float rDisc, float radialNorm, float spinDir) {
+        float theta = atan(hitPos.z, hitPos.x);
+        float omegaPattern = spinDir * (0.42 + 1.85 / max(0.35, rDisc));
+        float thetaAdv = theta - omegaPattern * u_time;
+        float swirl = thetaAdv * 6.2 + rDisc * 2.5;
+        float bandA = 0.5 + 0.5 * sin(swirl);
+        float bandB = 0.5 + 0.5 * sin(thetaAdv * 10.5 + rDisc * 4.2);
+        float waves = mix(bandA, bandB, 0.42);
+
+        float rot = omegaPattern * u_time;
+        float ca = cos(rot);
+        float sa = sin(rot);
+        vec2 xzRot = mat2(ca, -sa, sa, ca) * hitPos.xz;
+        vec3 flowUv = vec3(
+            xzRot.x * (3.8 + 1.2 * (1.0 - radialNorm)),
+            xzRot.y * (3.8 + 1.2 * (1.0 - radialNorm)),
+            u_time * 0.26
+        );
+        float cloud = fbm(flowUv);
+        cloud = smoothstep(0.28, 0.82, cloud);
+
+        float wisps = fbm(flowUv * 2.3 + vec3(2.7, -1.4, u_time * 0.25));
+        wisps = smoothstep(0.45, 0.93, wisps);
+
+        float structure = mix(cloud, wisps, 0.35);
+        return clamp(structure * (0.45 + 0.55 * waves), 0.05, 1.35);
     }
 
     vec3 starfield(vec3 dir) {
@@ -254,15 +298,16 @@ const fsSource = `
                         float gravDisc = kerrLapse(max(kerrHorizon() * 1.0005, rDisc));
                         float localShift = clamp(beaming * gravDisc, 0.20, 3.40);
 
-                        float turbulence = noise(vec3(hitPos.x * 5.0, hitPos.z * 5.0, u_time * 0.38));
-                        float shimmer = mix(0.65, 1.35, turbulence);
+                        float cloudWaves = discCloudWaves(hitPos, rDisc, radialNorm, spinDir);
+                        float plumeBias = 0.58 + 0.42 * smoothstep(0.0, 0.35, radialNorm);
+                        float shimmer = cloudWaves * plumeBias;
 
                         float heat = clamp(u_discTemp * (1.0 - 0.5 * radialNorm) + innerHot * 0.45, 0.0, 1.0);
                         vec3 emissive = discSpectrum(heat);
                         emissive = dopplerTint(emissive, localShift) * pow(localShift, 1.15);
 
                         float alphaDisc = clamp(
-                            u_discIntensity * radialProfile * thicknessFade * shimmer * 0.26,
+                            u_discIntensity * u_discDensity * radialProfile * thicknessFade * shimmer * 0.33,
                             0.0,
                             0.95
                         );
@@ -376,6 +421,7 @@ const uniformLocs = {
     discIntensity: gl.getUniformLocation(program, 'u_discIntensity'),
     discTemp: gl.getUniformLocation(program, 'u_discTemp'),
     discThickness: gl.getUniformLocation(program, 'u_discThickness'),
+    discDensity: gl.getUniformLocation(program, 'u_discDensity'),
     discInner: gl.getUniformLocation(program, 'u_discInner'),
     discOuter: gl.getUniformLocation(program, 'u_discOuter'),
 };
@@ -388,7 +434,7 @@ const C = 1.0;
 const MIN_MASS_SOLAR = 1e6;
 const MAX_MASS_SOLAR = 1e7;
 
-let massSolar = REFERENCE_MASS_SOLAR;
+let massSolar = INITIAL_MASS_SOLAR;
 let massSim = REFERENCE_M_SIM;
 let rsSim = 2 * massSim;
 let spinAstar = INITIAL_SPIN_ASTAR;
@@ -398,7 +444,8 @@ let gm = massSim;
 let discEnabled = true;
 let discIntensity = 1.0;
 let discTemperature = 0.62;
-let discThicknessRs = 0.055;
+let discThicknessRs = 0.220;
+let discDensity = 1.0;
 
 function clampSpin(v) {
     return Math.max(-0.999, Math.min(0.999, v));
@@ -431,7 +478,11 @@ function spinSign() {
 
 recomputeKerrDerived();
 
-let camPos = glMatrix.vec3.fromValues(0.0, 1.2, 14.0);
+let camPos = glMatrix.vec3.fromValues(
+    0.0,
+    INITIAL_HEIGHT_ABOVE_DISC_RS * rsSim,
+    Math.sqrt(Math.max(0.0, INITIAL_DISTANCE_RS * INITIAL_DISTANCE_RS - INITIAL_HEIGHT_ABOVE_DISC_RS * INITIAL_HEIGHT_ABOVE_DISC_RS)) * rsSim
+);
 let camForward = glMatrix.vec3.fromValues(0.0, -0.08, -1.0);
 let camUp = glMatrix.vec3.fromValues(0.0, 1.0, 0.0);
 let camRight = glMatrix.vec3.create();
@@ -442,9 +493,53 @@ glMatrix.vec3.normalize(camRight, camRight);
 // Local physical velocity (fraction of c) measured by local ZAMO-like observers.
 let velocity = glMatrix.vec3.create();
 const keys = Object.create(null);
+const keyCodes = Object.create(null);
+const worldUp = glMatrix.vec3.fromValues(0, 1, 0);
+const KEY_BINDINGS_STORAGE_KEY = 'bhsim_key_bindings_v1';
+const DEFAULT_KEY_BINDINGS = Object.freeze({
+    forward: 'KeyW',
+    backward: 'KeyS',
+    left: 'KeyA',
+    right: 'KeyD',
+    lift: 'KeyQ',
+    dive: 'KeyE',
+});
+
+function isBindableCode(code) {
+    return typeof code === 'string' && code.length > 0 && code !== 'Escape';
+}
+
+function loadKeyBindings() {
+    const next = { ...DEFAULT_KEY_BINDINGS };
+    try {
+        const raw = localStorage.getItem(KEY_BINDINGS_STORAGE_KEY);
+        if (!raw) return next;
+        const parsed = JSON.parse(raw);
+        Object.keys(DEFAULT_KEY_BINDINGS).forEach((action) => {
+            const code = parsed && parsed[action];
+            if (isBindableCode(code)) {
+                next[action] = code;
+            }
+        });
+    } catch (err) {
+        console.warn('Failed to load key bindings:', err);
+    }
+    return next;
+}
+
+function saveKeyBindings(bindings) {
+    try {
+        localStorage.setItem(KEY_BINDINGS_STORAGE_KEY, JSON.stringify(bindings));
+    } catch (err) {
+        console.warn('Failed to save key bindings:', err);
+    }
+}
+
+let keyBindings = loadKeyBindings();
+let pendingBindAction = null;
 
 let pointerLocked = false;
-let dragging = false;
+let lookHeld = false;
 let lastMouseX = 0;
 let lastMouseY = 0;
 
@@ -480,8 +575,46 @@ function rotateCamera(dx, dy) {
 }
 
 window.addEventListener('keydown', (e) => {
-    const k = e.key.toLowerCase();
-    keys[k] = true;
+    const k = String(e.key || '').toLowerCase();
+    const code = String(e.code || '');
+
+    if (pendingBindAction) {
+        e.preventDefault();
+        if (code === 'Escape') {
+            pendingBindAction = null;
+            if (typeof updateKeyBindingUi === 'function') {
+                updateKeyBindingUi();
+            }
+            return;
+        }
+        if (!isBindableCode(code)) {
+            return;
+        }
+
+        const oldCode = keyBindings[pendingBindAction];
+        const conflictAction = Object.keys(keyBindings).find(
+            (action) => action !== pendingBindAction && keyBindings[action] === code
+        );
+        keyBindings[pendingBindAction] = code;
+        if (conflictAction) {
+            keyBindings[conflictAction] = oldCode;
+        }
+        pendingBindAction = null;
+        saveKeyBindings(keyBindings);
+        if (typeof updateKeyBindingUi === 'function') {
+            updateKeyBindingUi();
+        }
+        Object.keys(keys).forEach((name) => {
+            keys[name] = false;
+        });
+        Object.keys(keyCodes).forEach((name) => {
+            keyCodes[name] = false;
+        });
+        return;
+    }
+
+    if (k) keys[k] = true;
+    if (code) keyCodes[code] = true;
 
     if (k === ' ') {
         e.preventDefault();
@@ -489,27 +622,44 @@ window.addEventListener('keydown', (e) => {
 });
 
 window.addEventListener('keyup', (e) => {
-    keys[e.key.toLowerCase()] = false;
+    const k = String(e.key || '').toLowerCase();
+    const code = String(e.code || '');
+    if (k) keys[k] = false;
+    if (code) keyCodes[code] = false;
 });
 
-canvas.addEventListener('click', () => {
+window.addEventListener('blur', () => {
+    Object.keys(keys).forEach((k) => {
+        keys[k] = false;
+    });
+    Object.keys(keyCodes).forEach((k) => {
+        keyCodes[k] = false;
+    });
+});
+
+document.addEventListener('pointerlockchange', () => {
+    pointerLocked = document.pointerLockElement === canvas;
+    if (!pointerLocked) {
+        lookHeld = false;
+    }
+});
+
+canvas.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    lookHeld = true;
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
     if (canvas.requestPointerLock) {
         canvas.requestPointerLock();
     }
 });
 
-document.addEventListener('pointerlockchange', () => {
-    pointerLocked = document.pointerLockElement === canvas;
-});
-
-canvas.addEventListener('mousedown', (e) => {
-    dragging = true;
-    lastMouseX = e.clientX;
-    lastMouseY = e.clientY;
-});
-
-window.addEventListener('mouseup', () => {
-    dragging = false;
+window.addEventListener('mouseup', (e) => {
+    if (e.button !== 0) return;
+    lookHeld = false;
+    if (document.pointerLockElement === canvas && document.exitPointerLock) {
+        document.exitPointerLock();
+    }
 });
 
 window.addEventListener('mousemove', (e) => {
@@ -518,7 +668,7 @@ window.addEventListener('mousemove', (e) => {
         return;
     }
 
-    if (!dragging) return;
+    if (!lookHeld) return;
     const dx = e.clientX - lastMouseX;
     const dy = e.clientY - lastMouseY;
     lastMouseX = e.clientX;
@@ -550,6 +700,10 @@ const spinSlider = document.getElementById('spin-slider');
 const spinInput = document.getElementById('spin-input');
 const warningBanner = document.getElementById('warning-banner');
 const horizonEducation = document.getElementById('horizon-education');
+const endingTitle = document.getElementById('ending-title');
+const endingLine1 = document.getElementById('ending-line-1');
+const endingLine2 = document.getElementById('ending-line-2');
+const endingLine3 = document.getElementById('ending-line-3');
 const restartBtn = document.getElementById('restart-btn');
 const discEnabledInput = document.getElementById('disc-enabled');
 const discIntensitySlider = document.getElementById('disc-intensity-slider');
@@ -558,6 +712,50 @@ const discTempSlider = document.getElementById('disc-temp-slider');
 const discTempInput = document.getElementById('disc-temp-input');
 const discThicknessSlider = document.getElementById('disc-thickness-slider');
 const discThicknessInput = document.getElementById('disc-thickness-input');
+const discDensitySlider = document.getElementById('disc-density-slider');
+const discDensityInput = document.getElementById('disc-density-input');
+const keybindToggleBtn = document.getElementById('keybind-toggle');
+const keybindPanel = document.getElementById('keybind-panel');
+const bindStatus = document.getElementById('keybind-status');
+const bindResetBtn = document.getElementById('bind-reset');
+const bindButtons = {
+    forward: document.getElementById('bind-forward'),
+    backward: document.getElementById('bind-backward'),
+    left: document.getElementById('bind-left'),
+    right: document.getElementById('bind-right'),
+    lift: document.getElementById('bind-lift'),
+    dive: document.getElementById('bind-dive'),
+};
+
+function bindingCodeLabel(code) {
+    if (!code) return 'UNSET';
+    if (code.startsWith('Key')) return code.slice(3);
+    if (code.startsWith('Digit')) return code.slice(5);
+    if (code === 'Space') return 'SPACE';
+    if (code.startsWith('Arrow')) return code.slice(5).toUpperCase();
+    return code.toUpperCase();
+}
+
+function updateKeyBindingUi() {
+    Object.entries(bindButtons).forEach(([action, btn]) => {
+        if (!btn) return;
+        btn.textContent = bindingCodeLabel(keyBindings[action]);
+        btn.classList.toggle('pending', pendingBindAction === action);
+    });
+
+    if (!bindStatus) return;
+    if (pendingBindAction) {
+        bindStatus.textContent = `Press a key for ${pendingBindAction.toUpperCase()} (ESC to cancel).`;
+    } else {
+        bindStatus.textContent = 'Click a binding button, then press a key.';
+    }
+}
+
+function setKeybindExpanded(expanded) {
+    if (!keybindToggleBtn || !keybindPanel) return;
+    keybindToggleBtn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    keybindPanel.classList.toggle('collapsed', !expanded);
+}
 
 function clampMassSolar(v) {
     return Math.max(MIN_MASS_SOLAR, Math.min(MAX_MASS_SOLAR, v));
@@ -608,6 +806,12 @@ function syncDiscUi() {
     }
     if (discThicknessInput) {
         discThicknessInput.value = discThicknessRs.toFixed(3);
+    }
+    if (discDensitySlider) {
+        discDensitySlider.value = discDensity.toFixed(2);
+    }
+    if (discDensityInput) {
+        discDensityInput.value = discDensity.toFixed(2);
     }
 }
 
@@ -701,7 +905,13 @@ function setDiscTemperature(nextValue) {
 
 function setDiscThicknessRs(nextValue) {
     if (!Number.isFinite(nextValue)) return;
-    discThicknessRs = Math.max(0.005, Math.min(0.22, nextValue));
+    discThicknessRs = Math.max(0.005, Math.min(0.5, nextValue));
+    syncDiscUi();
+}
+
+function setDiscDensity(nextValue) {
+    if (!Number.isFinite(nextValue)) return;
+    discDensity = Math.max(0.10, Math.min(3.0, nextValue));
     syncDiscUi();
 }
 
@@ -740,6 +950,44 @@ if (discThicknessInput) {
         setDiscThicknessRs(Number(discThicknessInput.value));
     });
 }
+if (discDensitySlider) {
+    discDensitySlider.addEventListener('input', () => {
+        setDiscDensity(Number(discDensitySlider.value));
+    });
+}
+if (discDensityInput) {
+    discDensityInput.addEventListener('change', () => {
+        setDiscDensity(Number(discDensityInput.value));
+    });
+}
+
+Object.entries(bindButtons).forEach(([action, btn]) => {
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+        setKeybindExpanded(true);
+        pendingBindAction = pendingBindAction === action ? null : action;
+        updateKeyBindingUi();
+    });
+});
+
+if (bindResetBtn) {
+    bindResetBtn.addEventListener('click', () => {
+        keyBindings = { ...DEFAULT_KEY_BINDINGS };
+        pendingBindAction = null;
+        saveKeyBindings(keyBindings);
+        updateKeyBindingUi();
+    });
+}
+
+if (keybindToggleBtn) {
+    keybindToggleBtn.addEventListener('click', () => {
+        const expanded = keybindToggleBtn.getAttribute('aria-expanded') === 'true';
+        setKeybindExpanded(!expanded);
+    });
+}
+
+setKeybindExpanded(false);
+updateKeyBindingUi();
 
 function resize() {
     const dpr = Math.min(window.devicePixelRatio || 3, 5);
@@ -882,6 +1130,16 @@ function formatClock(seconds) {
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${tenths}`;
 }
 
+function showEndingScene(title, line1, line2, line3) {
+    if (endingTitle) endingTitle.textContent = title;
+    if (endingLine1) endingLine1.textContent = line1;
+    if (endingLine2) endingLine2.textContent = line2;
+    if (endingLine3) endingLine3.textContent = line3;
+    if (horizonEducation) {
+        horizonEducation.classList.remove('hidden');
+    }
+}
+
 function endSimulationAtHorizon() {
     if (simulationEnded) return;
     simulationEnded = true;
@@ -891,9 +1149,29 @@ function endSimulationAtHorizon() {
     if (document.pointerLockElement === canvas && document.exitPointerLock) {
         document.exitPointerLock();
     }
-    if (horizonEducation) {
-        horizonEducation.classList.remove('hidden');
+    showEndingScene(
+        'Event horizon reached',
+        'Crossing an event horizon is often misunderstood. For a sufficiently large black hole, the horizon is not a hard surface you crash into, and in free fall you would not feel a sudden jolt at the instant of crossing. Locally, your physics still looks normal: clocks tick, instruments work, and nearby motion follows the same laws of general relativity. What changes is the large-scale causal structure of spacetime. Outside the horizon, some future-directed paths can still lead outward. At and inside the horizon, all future-directed paths lead to smaller radius.',
+        'That is why escape is impossible: it is not mainly about lacking engine power, it is about geometry. A rocket can change your trajectory, but it cannot create a future-directed path that does not exist in the local spacetime structure. To distant observers, your signals become increasingly redshifted and delayed as you approach the horizon, so you appear to slow and fade. From your own perspective, however, you cross the horizon in finite proper time and continue inward without seeing a special boundary line in front of you.',
+        'Inside the horizon, tidal effects generally grow as you move deeper inward. For supermassive black holes, tides near the horizon can be mild; for small black holes, they can become destructive much earlier. Classical relativity predicts continued inward evolution toward a singular region where curvature becomes extreme. The full microscopic outcome is expected to involve quantum gravity, which is still an open research problem. The key physical message is this: after horizon crossing, every physically allowed future path remains inside.'
+    );
+}
+
+function endSimulationAtCriticalTimeDilation() {
+    if (simulationEnded) return;
+    simulationEnded = true;
+    glMatrix.vec3.set(velocity, 0, 0, 0);
+    orbitLockActive = false;
+
+    if (document.pointerLockElement === canvas && document.exitPointerLock) {
+        document.exitPointerLock();
     }
+    showEndingScene(
+        'Event horizon reached',
+        'Crossing an event horizon is often misunderstood. For a sufficiently large black hole, the horizon is not a hard surface you crash into, and in free fall you would not feel a sudden jolt at the instant of crossing. Locally, your physics still looks normal: clocks tick, instruments work, and nearby motion follows the same laws of general relativity. What changes is the large-scale causal structure of spacetime. Outside the horizon, some future-directed paths can still lead outward. At and inside the horizon, all future-directed paths lead to smaller radius.',
+        'That is why escape is impossible: it is not mainly about lacking engine power, it is about geometry. A rocket can change your trajectory, but it cannot create a future-directed path that does not exist in the local spacetime structure. To distant observers, your signals become increasingly redshifted and delayed as you approach the horizon, so you appear to slow and fade. From your own perspective, however, you cross the horizon in finite proper time and continue inward without seeing a special boundary line in front of you.',
+        'Inside the horizon, tidal effects generally grow as you move deeper inward. For supermassive black holes, tides near the horizon can be mild; for small black holes, they can become destructive much earlier. Classical relativity predicts continued inward evolution toward a singular region where curvature becomes extreme. The full microscopic outcome is expected to involve quantum gravity, which is still an open research problem. The key physical message is this: after horizon crossing, every physically allowed future path remains inside.'
+    );
 }
 
 if (restartBtn) {
@@ -915,12 +1193,19 @@ function updatePhysics(dt) {
 
     const thrust = glMatrix.vec3.create();
     const thrustPower = 0.9;
-    if (keys.w) glMatrix.vec3.scaleAndAdd(thrust, thrust, camForward, thrustPower);
-    if (keys.r) glMatrix.vec3.scaleAndAdd(thrust, thrust, camForward, -thrustPower);
-    if (keys.a) glMatrix.vec3.scaleAndAdd(thrust, thrust, camRight, -thrustPower);
-    if (keys.s) glMatrix.vec3.scaleAndAdd(thrust, thrust, camRight, thrustPower);
-    if (keys.q) glMatrix.vec3.scaleAndAdd(thrust, thrust, camUp, thrustPower);
-    if (keys.e) glMatrix.vec3.scaleAndAdd(thrust, thrust, camUp, -thrustPower);
+    const verticalAssistSpeed = 1.35;
+    const forwardPressed = !!keyCodes[keyBindings.forward];
+    const backwardPressed = !!keyCodes[keyBindings.backward];
+    const leftPressed = !!keyCodes[keyBindings.left];
+    const rightPressed = !!keyCodes[keyBindings.right];
+    const liftPressed = !!keyCodes[keyBindings.lift];
+    const divePressed = !!keyCodes[keyBindings.dive];
+    if (forwardPressed) glMatrix.vec3.scaleAndAdd(thrust, thrust, camForward, thrustPower);
+    if (backwardPressed) glMatrix.vec3.scaleAndAdd(thrust, thrust, camForward, -thrustPower);
+    if (leftPressed) glMatrix.vec3.scaleAndAdd(thrust, thrust, camRight, -thrustPower);
+    if (rightPressed) glMatrix.vec3.scaleAndAdd(thrust, thrust, camRight, thrustPower);
+    if (liftPressed) glMatrix.vec3.scaleAndAdd(thrust, thrust, worldUp, thrustPower);
+    if (divePressed) glMatrix.vec3.scaleAndAdd(thrust, thrust, worldUp, -thrustPower);
 
     // Manual thrust cancels orbit lock and returns to free flight.
     if (glMatrix.vec3.length(thrust) > 1e-8) {
@@ -980,6 +1265,10 @@ function updatePhysics(dt) {
     glMatrix.vec3.scale(coordVel, vRadialVec, alpha * alpha);
     glMatrix.vec3.scaleAndAdd(coordVel, coordVel, vTangential, alpha);
     glMatrix.vec3.scaleAndAdd(coordVel, coordVel, azimuthDir, omegaFrame * rSafe);
+    if (liftPressed !== divePressed) {
+        const verticalSign = liftPressed ? 1 : -1;
+        glMatrix.vec3.scaleAndAdd(coordVel, coordVel, worldUp, verticalSign * verticalAssistSpeed);
+    }
 
     glMatrix.vec3.scaleAndAdd(camPos, camPos, coordVel, dt);
 
@@ -1020,6 +1309,11 @@ function updatePhysics(dt) {
     const alphaObs = kerrLapseAt(radiusSim);
     const dTauDt = Math.max(1e-12, alphaObs / gammaLocal);
     const dtOverDTau = 1 / dTauDt;
+
+    if (dTauDt < 0.1) {
+        endSimulationAtCriticalTimeDilation();
+        return;
+    }
 
     // Treat render-frame dt as onboard proper-time increment and map it to
     // coordinate-time using the instantaneous shift factor.
@@ -1089,6 +1383,7 @@ function render(timestamp) {
     gl.uniform1f(uniformLocs.discIntensity, discIntensity);
     gl.uniform1f(uniformLocs.discTemp, discTemperature);
     gl.uniform1f(uniformLocs.discThickness, discThicknessRs * rsSim);
+    gl.uniform1f(uniformLocs.discDensity, discDensity);
     const discInner = Math.max(horizonRs * 1.02, kerrProgradeIscoradiusSim());
     const discOuter = discInner + 12.0 * rsSim;
     gl.uniform1f(uniformLocs.discInner, discInner);
