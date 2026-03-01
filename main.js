@@ -233,15 +233,20 @@ const fsSource = `
                         float radialProfile = exp(-1.65 * radialNorm) * outerFade + 0.45 * innerHot;
                         float thicknessFade = exp(-abs(hitPos.y) / max(1e-5, u_discThickness));
 
-                        vec3 az = vec3(-hitPos.z, 0.0, hitPos.x);
+                        float spinDir = (u_spinAstar >= 0.0) ? 1.0 : -1.0;
+                        vec3 az = vec3(-spinDir * hitPos.z, 0.0, spinDir * hitPos.x);
                         float azLen = length(az);
                         if (azLen > 1e-6) {
                             az /= azLen;
                         } else {
-                            az = vec3(1.0, 0.0, 0.0);
+                            az = vec3(spinDir, 0.0, 0.0);
                         }
 
-                        float betaOrb = clamp(sqrt(u_massM / max(1e-4, rDisc)), 0.0, 0.72);
+                        float betaOrb = clamp(
+                            sqrt(u_massM / max(1e-4, rDisc)) * (0.86 + 0.14 * abs(u_spinAstar)),
+                            0.0,
+                            0.72
+                        );
                         float gammaOrb = 1.0 / sqrt(max(1e-5, 1.0 - betaOrb * betaOrb));
                         float mu = clamp(dot(az, -dir), -0.98, 0.98);
                         float beaming = 1.0 / max(0.06, gammaOrb * (1.0 - betaOrb * mu));

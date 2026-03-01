@@ -1,4 +1,4 @@
-# Black Hole Flight Simulator
+# Sagittarius A* Flight Simulator
 
 A browser-based Kerr black hole flight simulator with live mass and spin control:
 - Kerr horizon radius from `a*` (`r+ = M + sqrt(M^2 - a^2)`)
