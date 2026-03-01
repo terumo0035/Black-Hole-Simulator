@@ -20,7 +20,7 @@ A browser-based Kerr black hole flight simulator (static HTML/CSS/JS) with real-
 - Configurable key bindings (with local persistence)
 - Ending scene when:
   - event horizon is reached
-  - or `dτ/dt < 0.1`
+  - or distance to horizon is below `0.1 R_S`
 
 ## Startup defaults
 

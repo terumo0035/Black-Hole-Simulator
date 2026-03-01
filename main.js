@@ -1157,7 +1157,7 @@ function endSimulationAtHorizon() {
     );
 }
 
-function endSimulationAtCriticalTimeDilation() {
+function endSimulationNearHorizonThreshold() {
     if (simulationEnded) return;
     simulationEnded = true;
     glMatrix.vec3.set(velocity, 0, 0, 0);
@@ -1306,14 +1306,14 @@ function updatePhysics(dt) {
     const vFrac = Math.min(0.999999, glMatrix.vec3.length(velocity) / C);
     const gammaLocal = 1 / Math.sqrt(Math.max(1e-12, 1 - vFrac * vFrac));
 
+    const distToHorizonRs = Math.max(0, (radiusSim - horizonRs) / Math.max(1e-12, rsSim));
+    if (distToHorizonRs < 0.1) {
+        endSimulationNearHorizonThreshold();
+        return;
+    }
     const alphaObs = kerrLapseAt(radiusSim);
     const dTauDt = Math.max(1e-12, alphaObs / gammaLocal);
     const dtOverDTau = 1 / dTauDt;
-
-    if (dTauDt < 0.1) {
-        endSimulationAtCriticalTimeDilation();
-        return;
-    }
 
     // Treat render-frame dt as onboard proper-time increment and map it to
     // coordinate-time using the instantaneous shift factor.
@@ -1323,8 +1323,6 @@ function updatePhysics(dt) {
     accumulatedCoordinateTime += dCoordStep;
 
     const distRs = radiusSim / Math.max(1e-12, rsSim);
-    const distToHorizonRs = Math.max(0, (radiusSim - horizonRs) / Math.max(1e-12, rsSim));
-
     if (uiDist) {
         uiDist.textContent = distRs.toFixed(6);
     }
