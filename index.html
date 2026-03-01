@@ -14,7 +14,7 @@
 
     <div id="hud">
         <div class="panel top-left">
-            <h2>SAGITTARIUS A* TELEMETRY</h2>
+            <h2>BLACK HOLE TELEMETRY</h2>
             <div class="data-row">
                 <span class="label">MASS (M☉):</span>
                 <span class="value" id="mass-val">4.154e6</span>
@@ -22,6 +22,10 @@
             <div class="data-row">
                 <span class="label">SPIN (a*):</span>
                 <span class="value" id="spin-val">0.72</span>
+            </div>
+            <div class="data-row">
+                <span class="label">PHYSICS MODE:</span>
+                <span class="value" id="mode-val">geodesic-ish</span>
             </div>
             <div class="data-row">
                 <span class="label">DISTANCE TO CENTER (R_S):</span>
@@ -55,10 +59,21 @@
                 <li><span>Click / Esc</span><span>Capture or release pointer lock</span></li>
                 <li><span>W / R</span><span>Forward / backward thrust</span></li>
                 <li><span>A / S</span><span>Lateral strafing thrusters</span></li>
-                <li><span>Q / E</span><span>Vertical lift / dive thrusters</span></li>
+                <li><span>Q / F</span><span>Vertical lift / dive thrusters</span></li>
                 <li><span>Mouse</span><span>Freelook (or drag if unlocked)</span></li>
             </ul>
             <button id="fix-toggle" type="button">FIX: OFF</button>
+            <button id="brake-btn" type="button">BRAKE</button>
+            <div class="mass-controls">
+                <label for="mass-slider">Mass (M☉)</label>
+                <input id="mass-slider" type="range" min="1000000" max="10000000" step="10000" value="4154000">
+                <input id="mass-input" type="number" min="1000000" max="10000000" step="10000" value="4154000">
+            </div>
+            <div class="spin-controls">
+                <label for="spin-slider">Kerr spin a* (-0.999 to 0.999)</label>
+                <input id="spin-slider" type="range" min="-0.999" max="0.999" step="0.001" value="0.000">
+                <input id="spin-input" type="number" min="-0.999" max="0.999" step="0.001" value="0.000">
+            </div>
             <div class="transport-controls">
                 <label for="transport-rs-input">Jump from horizon (R_S)</label>
                 <div class="transport-row">
@@ -68,13 +83,49 @@
             </div>
         </div>
 
+        <div class="panel bottom-left-disc controls">
+            <h3>ACCRETION DISC</h3>
+            <div class="disc-controls">
+                <label class="disc-toggle">
+                    <input id="disc-enabled" type="checkbox" checked>
+                    <span>Accretion disc</span>
+                </label>
+                <label for="disc-intensity-slider">Disc intensity</label>
+                <input id="disc-intensity-slider" type="range" min="0" max="2.5" step="0.01" value="1.00">
+                <input id="disc-intensity-input" type="number" min="0" max="2.5" step="0.01" value="1.00">
+                <label for="disc-temp-slider">Disc temperature tint</label>
+                <input id="disc-temp-slider" type="range" min="0" max="1" step="0.01" value="0.62">
+                <input id="disc-temp-input" type="number" min="0" max="1" step="0.01" value="0.62">
+                <label for="disc-thickness-slider">Disc thickness (R_S)</label>
+                <input id="disc-thickness-slider" type="range" min="0.005" max="0.220" step="0.001" value="0.055">
+                <input id="disc-thickness-input" type="number" min="0.005" max="0.220" step="0.001" value="0.055">
+            </div>
+        </div>
+
         <div class="panel bottom-right clock-panel">
             <h3>COORDINATE TIME</h3>
             <div class="clock-readout" id="coord-clock">00:00:00</div>
         </div>
 
         <div id="warning-banner" class="hidden">
-            WARNING: EXTREME GRAVITATIONAL GRADIENT
+            WARNING: APPROACHING EVENT HORIZON
+        </div>
+
+        <div id="horizon-education" class="hidden">
+            <div class="education-card">
+                <h3>Event Horizon Reached</h3>
+                <p>You have touched the event horizon. The simulation is now paused.</p>
+                <p>
+                    In general relativity, crossing the horizon is locally uneventful for a falling observer,
+                    but all future-directed paths lead deeper inward. No signal from inside can return to the
+                    outside universe.
+                </p>
+                <p>
+                    For a distant observer, your clock appears increasingly slowed and redshifted near the
+                    horizon. For your own proper time, continuing inward to the singular region happens in finite time.
+                </p>
+                <button id="restart-btn" type="button">Restart Simulation</button>
+            </div>
         </div>
 
         <div id="crosshair">+</div>

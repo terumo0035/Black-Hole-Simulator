@@ -48,13 +48,20 @@ body, html {
 }
 
 .bottom-left {
-    bottom: 30px;
-    left: 30px;
+    bottom: 190px;
+    right: 30px;
+    left: auto;
 }
 
 .bottom-right {
     bottom: 30px;
     right: 30px;
+}
+
+.bottom-left-disc {
+    bottom: 30px;
+    left: 30px;
+    max-width: 330px;
 }
 
 .clock-panel {
@@ -152,8 +159,96 @@ h3 {
     color: #e8fff3;
 }
 
+#brake-btn {
+    margin-top: 8px;
+    width: 100%;
+    background: rgba(255, 120, 80, 0.18);
+    color: #ffe4d8;
+    border: 1px solid rgba(255, 140, 110, 0.6);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    letter-spacing: 1px;
+    cursor: pointer;
+}
+
 .transport-controls {
     margin-top: 12px;
+}
+
+.disc-controls {
+    margin-top: 12px;
+}
+
+.spin-controls {
+    margin-top: 12px;
+}
+
+.mass-controls {
+    margin-top: 12px;
+}
+
+.mass-controls label {
+    display: block;
+    font-size: 0.78rem;
+    letter-spacing: 0.6px;
+    opacity: 0.85;
+    margin-bottom: 6px;
+}
+
+#mass-slider {
+    width: 100%;
+    accent-color: #66f0ff;
+    margin-bottom: 8px;
+}
+
+#mass-input {
+    width: 100%;
+    background: rgba(0, 20, 40, 0.9);
+    color: #d9ffff;
+    border: 1px solid rgba(0, 255, 255, 0.45);
+    border-radius: 6px;
+    padding: 8px 9px;
+    font-family: inherit;
+    font-size: 0.85rem;
+    outline: none;
+    box-sizing: border-box;
+}
+
+#mass-input:focus {
+    border-color: rgba(120, 255, 255, 0.9);
+}
+
+.spin-controls label {
+    display: block;
+    font-size: 0.78rem;
+    letter-spacing: 0.6px;
+    opacity: 0.85;
+    margin-bottom: 6px;
+}
+
+#spin-slider {
+    width: 100%;
+    accent-color: #66f0ff;
+    margin-bottom: 8px;
+}
+
+#spin-input {
+    width: 100%;
+    background: rgba(0, 20, 40, 0.9);
+    color: #d9ffff;
+    border: 1px solid rgba(0, 255, 255, 0.45);
+    border-radius: 6px;
+    padding: 8px 9px;
+    font-family: inherit;
+    font-size: 0.85rem;
+    outline: none;
+    box-sizing: border-box;
+}
+
+#spin-input:focus {
+    border-color: rgba(120, 255, 255, 0.9);
 }
 
 .transport-controls label {
@@ -162,6 +257,55 @@ h3 {
     letter-spacing: 0.6px;
     opacity: 0.85;
     margin-bottom: 6px;
+}
+
+.disc-controls label {
+    display: block;
+    font-size: 0.78rem;
+    letter-spacing: 0.6px;
+    opacity: 0.85;
+    margin-bottom: 6px;
+}
+
+.disc-toggle {
+    display: flex !important;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px !important;
+}
+
+.disc-toggle input[type="checkbox"] {
+    accent-color: #66f0ff;
+}
+
+#disc-intensity-slider,
+#disc-temp-slider,
+#disc-thickness-slider {
+    width: 100%;
+    accent-color: #66f0ff;
+    margin-bottom: 8px;
+}
+
+#disc-intensity-input,
+#disc-temp-input,
+#disc-thickness-input {
+    width: 100%;
+    background: rgba(0, 20, 40, 0.9);
+    color: #d9ffff;
+    border: 1px solid rgba(0, 255, 255, 0.45);
+    border-radius: 6px;
+    padding: 8px 9px;
+    font-family: inherit;
+    font-size: 0.85rem;
+    outline: none;
+    box-sizing: border-box;
+    margin-bottom: 8px;
+}
+
+#disc-intensity-input:focus,
+#disc-temp-input:focus,
+#disc-thickness-input:focus {
+    border-color: rgba(120, 255, 255, 0.9);
 }
 
 .transport-row {
@@ -216,6 +360,54 @@ h3 {
 
 #warning-banner.hidden {
     display: none;
+}
+
+#horizon-education {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.78);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+    padding: 24px;
+}
+
+#horizon-education.hidden {
+    display: none;
+}
+
+.education-card {
+    max-width: 640px;
+    width: 100%;
+    background: rgba(5, 20, 36, 0.92);
+    border: 1px solid rgba(0, 255, 255, 0.45);
+    border-radius: 12px;
+    box-shadow: 0 0 22px rgba(0, 255, 255, 0.14);
+    padding: 22px;
+    color: #d8f9ff;
+}
+
+.education-card h3 {
+    margin-top: 0;
+}
+
+.education-card p {
+    line-height: 1.45;
+    margin: 10px 0;
+}
+
+#restart-btn {
+    margin-top: 12px;
+    background: rgba(0, 255, 255, 0.16);
+    color: #d9ffff;
+    border: 1px solid rgba(0, 255, 255, 0.55);
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    letter-spacing: 0.8px;
+    cursor: pointer;
 }
 
 @keyframes flash {
